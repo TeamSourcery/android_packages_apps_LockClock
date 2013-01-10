@@ -141,8 +141,8 @@
     <string name="weather_retrieve_location_dialog_enable_button">Enable</string>
     <string name="weather_invert_lowhigh">Invert low/high temperatures</string>
     <string name="weather_progress_title">Verifying location</string>
-    <string name="weather_alternate_icons_title">Use alternate icons</string>
-    <string name="weather_alternate_icons_summary">Select to toggle between the default (White) and the alternate (Color) icons</string>
+    <string name="weather_alternate_icons_title">Toggle Tools Mod Images on/off</string>
+    <string name="weather_alternate_icons_summary">Select to toggle between Stock or your Sourcery Tools Installed Weather Images.</string>
 
     <!-- Preferences - Calendar -->
     <string name="calendar_title">Display next event</string>
@@ -167,5 +167,23 @@
     <string name="calendar_metadata_none">Do not show</string>
     <string name="calendar_metadata_first_line">Show first line</string>
     <string name="calendar_metadata_all">Show all</string>
+
+   <!-- Colors - Strings for color changes -->
+   <string name="text_colors">Text Color</string>
+   <string name="time_color_title">Time color</string>
+   <string name="date_color_title">Date color</string>
+   <string name="alarm_color_title">Alarm color</string>
+   <string name="weather_color_title">Weather color</string>
+   <string name="calendar_color_title">Calendar color</string>
+   
+   <!-- Color Picker -->
+   <string name="dialog_color_picker">Color Picker</string>
+   <string name="press_color_to_apply">Press on Color to apply</string>
+   <string name="arrow_right">→</string>
+   <string name="arrow_down">↓</string>
+   <string name="hex">Hex:</string>
+   <string name="hex_hint">#FF000000</string>
+   <string name="set">Set</string>
+   <string name="ics_color">Holo</string>
 
 </resources>

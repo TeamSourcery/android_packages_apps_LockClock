@@ -57,6 +57,12 @@
             android:title="@string/weather_alternate_icons_title"
             android:summary="@string/weather_alternate_icons_summary" />
 
+       <net.margaritov.preference.colorpicker.ColorPickerPreference
+ 	    android:key="weather_color"
+            android:title="@string/weather_color_title"
+            android:defaultValue="@color/clock_white"
+            alphaSlider="true" />
+
         <CheckBoxPreference
             android:key="weather_use_metric"
             android:dependency="show_weather"

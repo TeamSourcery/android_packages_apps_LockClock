@@ -76,5 +76,12 @@
             android:title="@string/calendar_show_description_title"
             android:entries="@array/calendar_show_event_metadata_entries"
             android:entryValues="@array/calendar_show_event_metadata_values" />
+
+       <net.margaritov.preference.colorpicker.ColorPickerPreference
+            android:key="calendar_color"
+            android:title="@string/calendar_color_title"
+            android:defaultValue="@color/clock_white"
+            alphaSlider="true" />
+
     </PreferenceCategory>
 </PreferenceScreen>
