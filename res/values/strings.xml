@@ -141,7 +141,7 @@
     <string name="weather_retrieve_location_dialog_enable_button">Enable</string>
     <string name="weather_invert_lowhigh">Invert low/high temperatures</string>
     <string name="weather_progress_title">Verifying location</string>
-    <string name="weather_alternate_icons_title">Toggle Tools Mod Images on/off</string>
+    <string name="weather_alternate_icons_title">Toggle Stock and Mod Images</string>
     <string name="weather_alternate_icons_summary">Select to toggle between Stock or your Sourcery Tools Installed Weather Images.</string>
 
     <!-- Preferences - Calendar -->
