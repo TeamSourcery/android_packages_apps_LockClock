@@ -16,9 +16,6 @@
 
 package com.cyanogenmod.lockclock.preference;
 
-import static com.cyanogenmod.lockclock.misc.Constants.PREF_NAME;
-
-import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -34,6 +31,7 @@ import android.preference.PreferenceFragment;
 import android.provider.CalendarContract;
 
 import com.cyanogenmod.lockclock.ClockWidgetProvider;
+import com.cyanogenmod.lockclock.ClockWidgetService;
 import com.cyanogenmod.lockclock.R;
 import com.cyanogenmod.lockclock.misc.Constants;
 
@@ -42,40 +40,55 @@ import java.util.List;
 
 public class CalendarPreferences extends PreferenceFragment implements
     OnSharedPreferenceChangeListener {
-    private static final String TAG = "Calendar Preferences";
 
-    private MultiSelectListPreference mCalendarList;
     private Context mContext;
+    private ListPreference mFontColor;
+    private ListPreference mEventDetailsFontColor;
+    private ListPreference mHighlightFontColor;
+    private ListPreference mHighlightDetailsFontColor;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getPreferenceManager().setSharedPreferencesName(PREF_NAME);
+        getPreferenceManager().setSharedPreferencesName(Constants.PREF_NAME);
         addPreferencesFromResource(R.xml.preferences_calendar);
         mContext = getActivity();
 
-        // Load the required settings from preferences
-        SharedPreferences prefs = mContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-
         // The calendar list entries and values are determined at run time, not in XML
-        mCalendarList = (MultiSelectListPreference) findPreference(Constants.CALENDAR_LIST);
+        MultiSelectListPreference calendarList =
+                (MultiSelectListPreference) findPreference(Constants.CALENDAR_LIST);
         CalendarEntries calEntries = CalendarEntries.findCalendars(getActivity());
-        mCalendarList.setEntries(calEntries.getEntries());
-        mCalendarList.setEntryValues(calEntries.getEntryValues());
+        calendarList.setEntries(calEntries.getEntries());
+        calendarList.setEntryValues(calEntries.getEntryValues());
 
-        prefs.registerOnSharedPreferenceChangeListener(this);
+        mFontColor = (ListPreference) findPreference(Constants.CALENDAR_FONT_COLOR);
+        mEventDetailsFontColor = (ListPreference) findPreference(Constants.CALENDAR_DETAILS_FONT_COLOR);
+        mHighlightFontColor = (ListPreference) findPreference(Constants.CALENDAR_UPCOMING_EVENTS_FONT_COLOR);
+        mHighlightDetailsFontColor = (ListPreference) findPreference(Constants.CALENDAR_UPCOMING_EVENTS_DETAILS_FONT_COLOR);
+        updateFontColorsSummary();
     }
 
     @Override
-    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences,
-            String key) {
+    public void onResume() {
+        super.onResume();
+        getPreferenceManager().getSharedPreferences().registerOnSharedPreferenceChangeListener(this);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        getPreferenceManager().getSharedPreferences().unregisterOnSharedPreferenceChangeListener(this);
+    }
+
+    @Override
+    public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
         Preference pref = findPreference(key);
         if (pref instanceof ListPreference) {
             ListPreference listPref = (ListPreference) pref;
             pref.setSummary(listPref.getEntry());
         }
         Intent updateIntent = new Intent(mContext, ClockWidgetProvider.class);
-        updateIntent.putExtra(Constants.FORCE_REFRESH, true);
+        updateIntent.setAction(ClockWidgetService.ACTION_REFRESH_CALENDAR);
         mContext.sendBroadcast(updateIntent);
     }
 
@@ -128,6 +141,21 @@ public class CalendarPreferences extends PreferenceFragment implements
 
         CharSequence[] getEntryValues() {
             return mEntryValues;
+        }
+    }
+
+    private void updateFontColorsSummary() {
+        if (mFontColor != null) {
+            mFontColor.setSummary(mFontColor.getEntry());
+        }
+        if (mEventDetailsFontColor != null) {
+            mEventDetailsFontColor.setSummary(mEventDetailsFontColor.getEntry());
+        }
+        if (mHighlightFontColor != null) {
+            mHighlightFontColor.setSummary(mHighlightFontColor.getEntry());
+        }
+        if (mHighlightDetailsFontColor != null) {
+            mHighlightDetailsFontColor.setSummary(mHighlightDetailsFontColor.getEntry());
         }
     }
 }

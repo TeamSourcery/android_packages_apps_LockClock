@@ -20,6 +20,7 @@
     <string name="unknown">Unbekannt</string>
     <string name="cancel">Abbrechen</string>
     <string name="loading_indicator">Widget wird geladen\u2026</string>
+    <string name="menu_done">Fertig</string>
 
     <!-- Lock screen Weather - Weather codes -->
     <string name="weather_0">Tornado</string>
@@ -35,7 +36,7 @@
     <string name="weather_10">Gefrierender Regen</string>
     <string name="weather_11">Schauer</string>
     <string name="weather_12">Schauer</string>
-    <string name="weather_13">Scheegestöber</string>
+    <string name="weather_13">Schneegestöber</string>
     <string name="weather_14">Leichte Schneeschauer</string>
     <string name="weather_15">Schneesturm</string>
     <string name="weather_16">Schnee</string>
@@ -133,8 +134,10 @@
     <string name="weather_retrieve_location_dialog_enable_button">Aktivieren</string>
     <string name="weather_invert_lowhigh">Anzeigereihenfolge Min/Max-Temperatur tauschen</string>
     <string name="weather_progress_title">Standort wird überprüft</string>
-    <string name="weather_alternate_icons_title">Alternative Icons</string>
-    <string name="weather_alternate_icons_summary">Aktivieren, um statt der weißen Standardicons die alternativen, farbigen Icons zu nutzen.</string>
+    <string name="weather_alternate_icons_title">Farbige Icons</string>
+    <string name="weather_alternate_icons_summary">Die farbigen Standardicons anstelle der alternativen, weißen Icons verwenden</string>
+    <string name="weather_show_when_minimized_title">Minimierte Anzeige</string>
+    <string name="weather_show_when_minimized_summary">Wetterinformationen anzeigen, wenn das Widget minimiert ist</string>
 
     <!-- Preferences - Calendar -->
     <string name="calendar_title">Nächsten Termin anzeigen</string>
@@ -146,6 +149,16 @@
     <string name="calendar_lookahead_title">Zeitraum</string>
     <string name="calendar_show_location_title">Ort anzeigen</string>
     <string name="calendar_show_description_title">Beschreibung anzeigen</string>
+    <string name="calendar_upcoming_events_category">Bevorstehende Termine</string>
+    <string name="calendar_highlight_upcoming_events_title">Hervorheben</string>
+    <string name="calendar_highlight_upcoming_events_summary">Demnächst stattfindende Termine hervorheben</string>
+    <string name="calendar_highlight_upcoming_events_bold">Fettschrift</string>
+
+    <!-- Preferences - Font colors -->
+    <string name="font_color">Textfarbe</string>
+    <string name="font_color_alarm">Farbe des Alarms</string>
+    <string name="font_color_timestamp">Farbe der Aktualisierungszeit</string>
+    <string name="font_color_calendar_details">Farbe der Details</string>
 
      <!-- Lock screen calendar - lookahead -->
     <string name="calendar_lookahead_3hrs">3 Stunden</string>
@@ -154,10 +167,27 @@
     <string name="calendar_lookahead_1day">1 Tag</string>
     <string name="calendar_lookahead_3days">3 Tage</string>
     <string name="calendar_lookahead_1wk">1 Woche</string>
+    <string name="calendar_lookahead_2wks">2 Wochen</string>
+    <string name="calendar_lookahead_4wks">4 Wochen</string>
 
     <!-- Lock screen calendar - event metadata -->
     <string name="calendar_metadata_none">Nicht anzeigen</string>
     <string name="calendar_metadata_first_line">Nur die erste Zeile anzeigen</string>
     <string name="calendar_metadata_all">Alles anzeigen</string>
+
+    <!-- Font colors -->
+    <string name="white">Weiß</string>
+    <string name="grey">Grau</string>
+    <string name="black">Schwarz</string>
+    <string name="holo_blue_light">Helles Blau</string>
+    <string name="holo_green_light">Helles Grün</string>
+    <string name="holo_red_light">Helles Rot</string>
+    <string name="holo_blue_dark">Dunkles Blau</string>
+    <string name="holo_green_dark">Dunkles Grün</string>
+    <string name="holo_red_dark">Dunkles Rot</string>
+    <string name="holo_purple">Violett</string>
+    <string name="holo_orange_light">Helles Orange</string>
+    <string name="holo_orange_dark">Dunkles Orange</string>
+    <string name="holo_blue_bright">Leuchtendes Blau</string>
 
 </resources>

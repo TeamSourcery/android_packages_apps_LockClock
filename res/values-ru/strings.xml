@@ -20,6 +20,7 @@
     <string name="unknown">Неизвестно</string>
     <string name="cancel">Отмена</string>
     <string name="loading_indicator">Загрузка виджета\u2026</string>
+    <string name="menu_done">Готово</string>
 
     <!-- Weather - Weather codes -->
     <string name="weather_0">Торнадо</string>
@@ -36,7 +37,7 @@
     <string name="weather_11">Ливень</string>
     <string name="weather_12">Ливень</string>
     <string name="weather_13">Снег с дождём</string>
-    <string name="weather_14">Небольшой дождь со снегом</string>
+    <string name="weather_14">Небольшой снег</string>
     <string name="weather_15">Позёмка</string>
     <string name="weather_16">Снег</string>
     <string name="weather_17">Град</string>
@@ -86,7 +87,7 @@
     <!-- Weather - error messages -->
     <string name="weather_no_data">Нет данных</string>
     <string name="weather_tap_to_refresh">Нажмите для обновления</string>
-    <string name="weather_refreshing">Обновление...</string>
+    <string name="weather_refreshing">Обновление\u2026</string>
     <string name="weather_last_sync_just_now">Только что</string>
 
     <!-- Weather - Update frequency -->
@@ -101,7 +102,7 @@
     <!-- Preferences - Categories -->
     <string name="clock_category">Часы и будильник</string>
     <string name="weather_category">Погода</string>
-    <string name="calendar_category">События календаря</string>
+    <string name="calendar_category">Календарь</string>
 
     <!-- Preferences - Categories -->
     <string name="general_category">Основные</string>
@@ -118,7 +119,7 @@
     <!-- Preferences - Weather -->
     <string name="weather_enabled">Включено</string>
     <string name="weather_enable">Погода отображается</string>
-    <string name="weather_source">Yahoo! Weather</string>
+    <string name="weather_source">Yahoo! Погода</string>
     <string name="weather_use_custom_location">Не определять автоматически</string>
     <string name="weather_geolocated">Местоположение по сети</string>
     <string name="weather_custom_location_dialog_title">Введите местоположение</string>
@@ -133,19 +134,31 @@
     <string name="weather_retrieve_location_dialog_enable_button">Включить</string>
     <string name="weather_invert_lowhigh">Изменить порядок температур</string>
     <string name="weather_progress_title">Проверка местоположения</string>
-    <string name="weather_alternate_icons_title">Альтернативные иконки</string>
-    <string name="weather_alternate_icons_summary">Выбор между иконками по умолчанию (белые) или альтернативными (цветные)</string>
+    <string name="weather_alternate_icons_title">Цветные иконки</string>
+    <string name="weather_alternate_icons_summary">Выбор между иконками по умолчанию (цветные) или альтернативными (белые)</string>
+    <string name="weather_show_when_minimized_title">Показывать всегда</string>
+    <string name="weather_show_when_minimized_summary">Отображать погоду, когда виджет в свёрнутом состоянии</string>
 
     <!-- Preferences - Calendar -->
-    <string name="calendar_title">Показывать следующие события</string>
+    <string name="calendar_title">Показывать события</string>
     <string name="calendars_title">События календарей</string>
-    <string name="calendars_summary">Найти события из этих календарей</string>
+    <string name="calendars_summary">Показывать события из этих календарей</string>
     <string name="calendar_reminders_only_title">Только с напоминаниями</string>
     <string name="calendar_reminders_only_summary">Отображать только события с напоминаниями</string>
     <string name="calendar_hide_allday_title">Скрыть все события дня</string>
     <string name="calendar_lookahead_title">Предпросмотр события</string>
     <string name="calendar_show_location_title">Место проведения</string>
     <string name="calendar_show_description_title">Описание события</string>
+    <string name="calendar_upcoming_events_category">Предстоящие события</string>
+    <string name="calendar_highlight_upcoming_events_title">Выделять события</string>
+    <string name="calendar_highlight_upcoming_events_summary">Выделять события текущего дня, а после 20:00 также события следующего дня</string>
+    <string name="calendar_highlight_upcoming_events_bold">Полужирный шрифт</string>
+
+    <!-- Preferences - Font colors -->
+    <string name="font_color">Цвет шрифта</string>
+    <string name="font_color_alarm">Будильник</string>
+    <string name="font_color_timestamp">Дата</string>
+    <string name="font_color_calendar_details">Календарь</string>
 
     <!-- Calendar - lookahead -->
     <string name="calendar_lookahead_3hrs">3 часа</string>
@@ -154,10 +167,27 @@
     <string name="calendar_lookahead_1day">1 день</string>
     <string name="calendar_lookahead_3days">3 дня</string>
     <string name="calendar_lookahead_1wk">1 неделя</string>
+    <string name="calendar_lookahead_2wks">2 недели</string>
+    <string name="calendar_lookahead_4wks">4 недели</string>
 
     <!-- Calendar - Event metadata -->
     <string name="calendar_metadata_none">Не показывать</string>
     <string name="calendar_metadata_first_line">Показывать первую строку</string>
     <string name="calendar_metadata_all">Показывать всё</string>
+
+    <!-- Font colors -->
+    <string name="white">Белый</string>
+    <string name="grey">Серый</string>
+    <string name="black">Чёрный</string>
+    <string name="holo_blue_light">Голубой</string>
+    <string name="holo_green_light">Светло-зелёный</string>
+    <string name="holo_red_light">Светло-красный</string>
+    <string name="holo_blue_dark">Синий</string>
+    <string name="holo_green_dark">Тёмно-зелёный</string>
+    <string name="holo_red_dark">Тёмно-красный</string>
+    <string name="holo_purple">Фиолетовый</string>
+    <string name="holo_orange_light">Светло-оранжевый</string>
+    <string name="holo_orange_dark">Тёмно-оранжевый</string>
+    <string name="holo_blue_bright">Ярко-синий</string>
 
 </resources>

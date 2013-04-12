@@ -17,10 +17,11 @@
 <resources>
 
     <!-- General strings -->
-    <string name="app_name" translatable="false">MagicClock</string>
+    <string name="app_name" translatable="false">Magic Clock</string>
     <string name="unknown">Unknown</string>
     <string name="cancel">Cancel</string>
     <string name="loading_indicator">Loading widget\u2026</string>
+    <string name="menu_done">Done</string>
 
     <!-- Formating strings for widget clock -->
     <string name="widget_12_hours_format_h" translatable="false">h</string>
@@ -141,8 +142,10 @@
     <string name="weather_retrieve_location_dialog_enable_button">Enable</string>
     <string name="weather_invert_lowhigh">Invert low/high temperatures</string>
     <string name="weather_progress_title">Verifying location</string>
-    <string name="weather_alternate_icons_title">Toggle Stock and Mod Images</string>
-    <string name="weather_alternate_icons_summary">Select to toggle between Stock or your Sourcery Tools Installed Weather Images.</string>
+    <string name="weather_alternate_icons_title">Icon Toggler</string>
+    <string name="weather_alternate_icons_summary">Select to toggle Colorable Icons and JBS Tools icons</string>
+    <string name="weather_show_when_minimized_title">Show when minimized</string>
+    <string name="weather_show_when_minimized_summary">Display summary weather information when the widget is minimized</string>
 
     <!-- Preferences - Calendar -->
     <string name="calendar_title">Display next event</string>
@@ -154,6 +157,16 @@
     <string name="calendar_lookahead_title">Event lookahead</string>
     <string name="calendar_show_location_title">Event location</string>
     <string name="calendar_show_description_title">Event description</string>
+    <string name="calendar_upcoming_events_category">Upcoming events</string>
+    <string name="calendar_highlight_upcoming_events_title">Highlight events</string>
+    <string name="calendar_highlight_upcoming_events_summary">Highlight the current day\'s events and, after 8pm, also the next day\'s events</string>
+    <string name="calendar_highlight_upcoming_events_bold">Bold font</string>
+
+    <!-- Preferences - Font colors -->
+    <string name="font_color">Font color</string>
+    <string name="font_color_alarm">Alarm font color</string>
+    <string name="font_color_timestamp">Timestamp font color</string>
+    <string name="font_color_calendar_details">Details font color</string>
 
     <!-- Calendar - lookahead -->
     <string name="calendar_lookahead_3hrs">3 hours</string>
@@ -162,28 +175,27 @@
     <string name="calendar_lookahead_1day">1 day</string>
     <string name="calendar_lookahead_3days">3 days</string>
     <string name="calendar_lookahead_1wk">1 week</string>
+    <string name="calendar_lookahead_2wks">2 weeks</string>
+    <string name="calendar_lookahead_4wks">4 weeks</string>
 
     <!-- Calendar - Event metadata -->
     <string name="calendar_metadata_none">Do not show</string>
     <string name="calendar_metadata_first_line">Show first line</string>
     <string name="calendar_metadata_all">Show all</string>
 
-   <!-- Colors - Strings for color changes -->
-   <string name="text_colors">Text Color</string>
-   <string name="time_color_title">Time color</string>
-   <string name="date_color_title">Date color</string>
-   <string name="alarm_color_title">Alarm color</string>
-   <string name="weather_color_title">Weather color</string>
-   <string name="calendar_color_title">Calendar color</string>
-   
-   <!-- Color Picker -->
-   <string name="dialog_color_picker">Color Picker</string>
-   <string name="press_color_to_apply">Press on Color to apply</string>
-   <string name="arrow_right">→</string>
-   <string name="arrow_down">↓</string>
-   <string name="hex">Hex:</string>
-   <string name="hex_hint">#FF000000</string>
-   <string name="set">Set</string>
-   <string name="ics_color">Holo</string>
+    <!-- Font colors -->
+    <string name="white">White</string>
+    <string name="grey">Grey</string>
+    <string name="black">Black</string>
+    <string name="holo_blue_light">Light blue</string>
+    <string name="holo_green_light">Light green</string>
+    <string name="holo_red_light">Light red</string>
+    <string name="holo_blue_dark">Dark blue</string>
+    <string name="holo_green_dark">Dark green</string>
+    <string name="holo_red_dark">Dark red</string>
+    <string name="holo_purple">Purple</string>
+    <string name="holo_orange_light">Light orange</string>
+    <string name="holo_orange_dark">Dark orange</string>
+    <string name="holo_blue_bright">Bright blue</string>
 
 </resources>

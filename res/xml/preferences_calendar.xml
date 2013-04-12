@@ -23,7 +23,8 @@
 
         <CheckBoxPreference
             android:key="show_calendar"
-            android:title="@string/calendar_title" />
+            android:title="@string/calendar_title"
+            android:defaultValue="false" />
 
         <MultiSelectListPreference
             android:key="calendar_list"
@@ -38,7 +39,7 @@
             android:summary="%s"
             android:dialogTitle="@string/calendar_lookahead_title"
             android:title="@string/calendar_lookahead_title"
-            android:defaultValue="10800000"
+            android:defaultValue="1209600000"
             android:entries="@array/calendar_lookahead_entries"
             android:entryValues="@array/calendar_lookahead_values" />
 
@@ -46,12 +47,14 @@
             android:key="calendar_reminders_only"
             android:dependency="show_calendar"
             android:title="@string/calendar_reminders_only_title"
-            android:summary="@string/calendar_reminders_only_summary" />
+            android:summary="@string/calendar_reminders_only_summary"
+            android:defaultValue="false" />
 
         <CheckBoxPreference
             android:key="calendar_hide_allday"
             android:dependency="show_calendar"
-            android:title="@string/calendar_hide_allday_title" />
+            android:title="@string/calendar_hide_allday_title"
+            android:defaultValue="false" />
     </PreferenceCategory>
 
     <PreferenceCategory
@@ -77,11 +80,53 @@
             android:entries="@array/calendar_show_event_metadata_entries"
             android:entryValues="@array/calendar_show_event_metadata_values" />
 
-       <net.margaritov.preference.colorpicker.ColorPickerPreference
-            android:key="calendar_color"
-            android:title="@string/calendar_color_title"
-            android:defaultValue="@color/clock_white"
-            alphaSlider="true" />
+        <ListPreference
+            android:key="calendar_font_color"
+            android:title="@string/font_color"
+            android:dependency="show_calendar"
+            android:defaultValue="#ffffffff"
+            android:entries="@array/font_color_entries"
+            android:entryValues="@array/font_color_values" />
 
+        <ListPreference
+            android:key="calendar_details_font_color"
+            android:title="@string/font_color_calendar_details"
+            android:dependency="show_calendar"
+            android:defaultValue="#80ffffff"
+            android:entries="@array/font_color_entries"
+            android:entryValues="@array/font_color_values" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/calendar_upcoming_events_category" >
+
+        <CheckBoxPreference
+            android:key="calendar_highlight_upcoming_events"
+            android:dependency="show_calendar"
+            android:title="@string/calendar_highlight_upcoming_events_title"
+            android:summary="@string/calendar_highlight_upcoming_events_summary"
+            android:defaultValue="false" />
+
+        <CheckBoxPreference
+            android:key="calendar_highlight_upcoming_events_bold"
+            android:dependency="calendar_highlight_upcoming_events"
+            android:title="@string/calendar_highlight_upcoming_events_bold"
+            android:defaultValue="false" />
+
+        <ListPreference
+            android:key="calendar_highlight_upcoming_events_font_color"
+            android:title="@string/font_color"
+            android:dependency="calendar_highlight_upcoming_events"
+            android:defaultValue="#ffffffff"
+            android:entries="@array/font_color_entries"
+            android:entryValues="@array/font_color_values" />
+
+        <ListPreference
+            android:key="calendar_highlight_upcoming_events_details_font_color"
+            android:title="@string/font_color_calendar_details"
+            android:dependency="calendar_highlight_upcoming_events"
+            android:defaultValue="#80ffffff"
+            android:entries="@array/font_color_entries"
+            android:entryValues="@array/font_color_values" />
     </PreferenceCategory>
 </PreferenceScreen>

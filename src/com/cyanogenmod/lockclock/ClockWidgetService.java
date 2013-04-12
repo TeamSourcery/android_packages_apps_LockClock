@@ -16,168 +16,159 @@
 
 package com.cyanogenmod.lockclock;
 
+import android.app.AlarmManager;
+import android.app.IntentService;
 import android.app.PendingIntent;
-import android.app.Service;
 import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.res.Resources;
-import android.database.Cursor;
-import android.location.Criteria;
-import android.location.Location;
-import android.location.LocationManager;
 import android.net.Uri;
-import android.os.AsyncTask;
-import android.os.IBinder;
-import android.provider.CalendarContract;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.text.format.DateFormat;
-import android.text.format.DateUtils;
-import android.text.format.Time;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
 
+import com.cyanogenmod.lockclock.calendar.CalendarWidgetService;
 import com.cyanogenmod.lockclock.misc.Constants;
+import com.cyanogenmod.lockclock.misc.Preferences;
 import com.cyanogenmod.lockclock.misc.WidgetUtils;
-
-import static com.cyanogenmod.lockclock.misc.Constants.PREF_NAME;
-import static com.cyanogenmod.lockclock.misc.Constants.MAX_CALENDAR_ITEMS;
-import com.cyanogenmod.lockclock.weather.HttpRetriever;
 import com.cyanogenmod.lockclock.weather.WeatherInfo;
-import com.cyanogenmod.lockclock.weather.WeatherXmlParser;
-import com.cyanogenmod.lockclock.weather.YahooPlaceFinder;
-
-import org.w3c.dom.Document;
-
-import java.io.IOException;
-import java.text.SimpleDateFormat;
+import com.cyanogenmod.lockclock.weather.WeatherUpdateService;
 import java.util.Date;
-import java.util.Set;
-import java.util.TimeZone;
+import java.util.Locale;
 
-public class ClockWidgetService extends Service {
+public class ClockWidgetService extends IntentService {
     private static final String TAG = "ClockWidgetService";
-    private static final boolean DEBUG = false;
+    private static final boolean D = Constants.DEBUG;
 
-    private Context mContext;
+    public static final String ACTION_REFRESH = "com.cyanogenmod.lockclock.action.REFRESH_WIDGET";
+    public static final String ACTION_REFRESH_CALENDAR = "com.cyanogenmod.lockclock.action.REFRESH_CALENDAR";
+    public static final String ACTION_HIDE_CALENDAR = "com.cyanogenmod.lockclock.action.HIDE_CALENDAR";
+
+    // This needs to be static to persist between refreshes until explicitly changed by an intent
+    private static boolean mHideCalendar = false;
+
     private int[] mWidgetIds;
     private AppWidgetManager mAppWidgetManager;
-    private SharedPreferences mSharedPrefs;
-    private boolean mForceRefresh;
+
+    public ClockWidgetService() {
+        super("ClockWidgetService");
+    }
 
     @Override
     public void onCreate() {
-        mContext = getApplicationContext();
-        mAppWidgetManager = AppWidgetManager.getInstance(mContext);
-        ComponentName thisWidget = new ComponentName(mContext, ClockWidgetProvider.class);
+        super.onCreate();
+
+        ComponentName thisWidget = new ComponentName(this, ClockWidgetProvider.class);
+        mAppWidgetManager = AppWidgetManager.getInstance(this);
         mWidgetIds = mAppWidgetManager.getAppWidgetIds(thisWidget);
-        mSharedPrefs = mContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-        mForceRefresh = false;
     }
 
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        // See if we are forcing a full weather refresh
-        if (intent != null && intent.getBooleanExtra(Constants.FORCE_REFRESH, false)) {
-            if (DEBUG) Log.d(TAG, "Forcing a weather refresh");
-            mForceRefresh = true;
-        }
+    protected void onHandleIntent(Intent intent) {
+        if (D) Log.d(TAG, "Got intent " + intent);
 
-        // Refresh the widgets
         if (mWidgetIds != null && mWidgetIds.length != 0) {
+            // Check passed in intents
+            if (intent != null) {
+                if (ACTION_HIDE_CALENDAR.equals(intent.getAction())) {
+                    if (D) Log.v(TAG, "Force hiding the calendar panel");
+                    // Explicitly hide the panel since we received a broadcast indicating no events
+                    mHideCalendar = true;
+                } else if (ACTION_REFRESH_CALENDAR.equals(intent.getAction())) {
+                    if (D) Log.v(TAG, "Forcing a calendar refresh");
+                    // Start with the panel not explicitly hidden
+                    // If there are no events, a broadcast to the service will hide the panel
+                    mHideCalendar = false;
+                    mAppWidgetManager.notifyAppWidgetViewDataChanged(mWidgetIds, R.id.calendar_list);
+                }
+            }
             refreshWidget();
-        } else {
-            stopSelf();
         }
-        return START_STICKY;
-    }
-
-    @Override
-    public IBinder onBind(Intent intent) {
-      return null;
     }
 
     /**
      * Reload the widget including the Weather forecast, Alarm, Clock font and Calendar
      */
     private void refreshWidget() {
-        // If we need to show the weather, do so
-        boolean showWeather = mSharedPrefs.getBoolean(Constants.SHOW_WEATHER, false);
-
-        if (showWeather) {
-            // Load the required settings from preferences
-            final long interval = Long.parseLong(mSharedPrefs.getString(Constants.WEATHER_REFRESH_INTERVAL, "60"));
-            boolean manualSync = (interval == 0);
-            if (mForceRefresh || (!manualSync && (((System.currentTimeMillis() - mWeatherInfo.last_sync) / 60000) >= interval))) {
-                if (mWeatherQueryTask == null || mWeatherQueryTask.getStatus() == AsyncTask.Status.FINISHED) {
-                    mWeatherQueryTask = new WeatherQueryTask();
-                    mWeatherQueryTask.execute();
-                    mForceRefresh = false;
-                }
-            } else if (manualSync && mWeatherInfo.last_sync == 0) {
-                setNoWeatherData();
-            } else {
-                setWeatherData(mWeatherInfo);
-            }
-        } else {
-            updateAndExit();
-        }
-    }
-
-    private void updateAndExit() {
-        RemoteViews remoteViews = new RemoteViews(mContext.getPackageName(), R.layout.appwidget);
-        updateAndExit(remoteViews);
-    }
-
-    /**
-     * Refresh Alarm and Calendar (if visible) and update the widget views 
-     */
-    private void updateAndExit(RemoteViews remoteViews) {
-        // Refresh the remaining widget panels.
-        //NOTE: Weather is updated prior to this method being called
-        refreshClock(remoteViews);
-        refreshAlarmStatus(remoteViews);
-        boolean hasCalEvents = refreshCalendar(remoteViews);
-
-        WidgetUtils.setClockColor(mContext, remoteViews, mSharedPrefs);
-
-        // Hide the Loading indicator
-        remoteViews.setViewVisibility(R.id.loading_indicator, View.GONE);
+        // Get things ready
+        RemoteViews remoteViews;
+        boolean digitalClock = Preferences.showDigitalClock(this);
+        boolean showWeather = Preferences.showWeather(this);
+        boolean showWeatherWhenMinimized = Preferences.showWeatherWhenMinimized(this);
+        boolean showCalendar = false;
 
         // Update the widgets
-        boolean showWeather = mSharedPrefs.getBoolean(Constants.SHOW_WEATHER, false);
-        boolean showCalendar = hasCalEvents && mSharedPrefs.getBoolean(Constants.SHOW_CALENDAR, false);
-        boolean digitalClock = mSharedPrefs.getBoolean(Constants.CLOCK_DIGITAL, true);
         for (int id : mWidgetIds) {
+
+            // Determine which layout to use
+            boolean smallWidget = showWeather && showWeatherWhenMinimized
+                    && WidgetUtils.showSmallWidget(this, id, digitalClock);
+            if (smallWidget) {
+                // The small widget is only shown if weather needs to be shown
+                // and there is not enough space for the full weather widget and
+                // the user had selected to show the weather when minimized (default ON)
+                remoteViews = new RemoteViews(getPackageName(), R.layout.appwidget_small);
+                showCalendar = false;
+            } else {
+                remoteViews = new RemoteViews(getPackageName(), R.layout.appwidget);
+                showCalendar = Preferences.showCalendar(this) && !mHideCalendar;
+            }
+
+            // Always Refresh the Clock widget
+            refreshClock(remoteViews, smallWidget, digitalClock);
+            refreshAlarmStatus(remoteViews, smallWidget);
+
+            // Don't bother with Calendar if its not enabled
+            if (showCalendar) {
+                refreshCalendar(remoteViews, id);
+            }
+
+            // Hide the Loading indicator
+            remoteViews.setViewVisibility(R.id.loading_indicator, View.GONE);
+
+            // Now, if we need to show the actual weather, do so
+            if (showWeather) {
+                WeatherInfo weatherInfo = Preferences.getCachedWeatherInfo(this);
+
+                if (weatherInfo != null) {
+                    setWeatherData(remoteViews, smallWidget, weatherInfo);
+                } else {
+                    setNoWeatherData(remoteViews, smallWidget);
+                }
+            }
+
             // Resize the clock font if needed
             if (digitalClock) {
-                float ratio = WidgetUtils.getScaleRatio(mContext, id);
+                float ratio = WidgetUtils.getScaleRatio(this, id);
                 setClockSize(remoteViews, ratio);
             }
 
-            // Hide the panels if there is no space for them
-            boolean canFitWeather = WidgetUtils.canFitWeather(mContext, id, digitalClock);
-            boolean canFitCalendar = WidgetUtils.canFitCalendar(mContext, id, digitalClock);
-            remoteViews.setViewVisibility(R.id.weather_panel, canFitWeather && showWeather ? View.VISIBLE : View.GONE);
-            remoteViews.setViewVisibility(R.id.calendar_panel, canFitCalendar && showCalendar ? View.VISIBLE : View.GONE);
+            if (showWeather) {
+                boolean canFitWeather = smallWidget || WidgetUtils.canFitWeather(this, id, digitalClock);
+                remoteViews.setViewVisibility(R.id.weather_panel, canFitWeather ? View.VISIBLE : View.GONE);
+            }
+
+            // Hide the calendar panel if there is no space for it
+            boolean shouldDisplayCalendar = showCalendar && WidgetUtils.canFitCalendar(this, id, digitalClock);
+            remoteViews.setViewVisibility(R.id.calendar_panel, shouldDisplayCalendar ? View.VISIBLE : View.GONE);
 
             // Do the update
             mAppWidgetManager.updateAppWidget(id, remoteViews);
         }
-        stopSelf();
     }
 
     //===============================================================================================
     // Clock related functionality
     //===============================================================================================
-    private void refreshClock(RemoteViews clockViews) {
+    private void refreshClock(RemoteViews clockViews, boolean smallWidget, boolean digitalClock) {
         // Analog or Digital clock
-        if (mSharedPrefs.getBoolean(Constants.CLOCK_DIGITAL, true)) {
+        if (digitalClock) {
             // Hours/Minutes is specific to Didital, set it's size
             refreshClockFont(clockViews);
             clockViews.setViewVisibility(R.id.digital_clock, View.VISIBLE);
@@ -187,44 +178,59 @@ public class ClockWidgetService extends Service {
             clockViews.setViewVisibility(R.id.digital_clock, View.GONE);
         }
 
-        // Date/Alarm is to both clocks common, set it's size
-        refreshDateAlarmFont(clockViews);
+        // Date/Alarm is common to both clocks, set it's size
+        refreshDateAlarmFont(clockViews, smallWidget);
 
         // Register an onClickListener on Clock, starting DeskClock
         ComponentName clk = new ComponentName("com.android.deskclock", "com.android.deskclock.DeskClock");
         Intent i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(clk);
-        PendingIntent pi = PendingIntent.getActivity(mContext, 0, i, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pi = PendingIntent.getActivity(this, 0, i, PendingIntent.FLAG_UPDATE_CURRENT);
         clockViews.setOnClickPendingIntent(R.id.clock_panel, pi);
     }
 
     private void refreshClockFont(RemoteViews clockViews) {
+        int color = Preferences.clockFontColor(this);
+
         // Hours
-        if (mSharedPrefs.getBoolean(Constants.CLOCK_FONT, true)) {
+        if (Preferences.useBoldFontForHours(this)) {
             clockViews.setViewVisibility(R.id.clock1_bold, View.VISIBLE);
             clockViews.setViewVisibility(R.id.clock1_regular, View.GONE);
+            clockViews.setTextColor(R.id.clock1_bold, color);
         } else {
             clockViews.setViewVisibility(R.id.clock1_regular, View.VISIBLE);
             clockViews.setViewVisibility(R.id.clock1_bold, View.GONE);
+            clockViews.setTextColor(R.id.clock1_regular, color);
         }
 
         // Minutes
-        if (mSharedPrefs.getBoolean(Constants.CLOCK_FONT_MINUTES, false)) {
+        if (Preferences.useBoldFontForMinutes(this)) {
             clockViews.setViewVisibility(R.id.clock2_bold, View.VISIBLE);
             clockViews.setViewVisibility(R.id.clock2_regular, View.GONE);
+            clockViews.setTextColor(R.id.clock2_bold, color);
         } else {
             clockViews.setViewVisibility(R.id.clock2_regular, View.VISIBLE);
             clockViews.setViewVisibility(R.id.clock2_bold, View.GONE);
+            clockViews.setTextColor(R.id.clock2_regular, color);
         }
     }
 
-    private void refreshDateAlarmFont(RemoteViews clockViews) {
+    private void refreshDateAlarmFont(RemoteViews clockViews, boolean smallWidget) {
+        int color = Preferences.clockFontColor(this);
+
         // Date and Alarm font
-        if (mSharedPrefs.getBoolean(Constants.CLOCK_FONT_DATE, true)) {
-            clockViews.setViewVisibility(R.id.date_bold, View.VISIBLE);
-            clockViews.setViewVisibility(R.id.date_regular, View.GONE);
+        if (!smallWidget) {
+            if (Preferences.useBoldFontForDateAndAlarms(this)) {
+                clockViews.setViewVisibility(R.id.date_bold, View.VISIBLE);
+                clockViews.setViewVisibility(R.id.date_regular, View.GONE);
+                clockViews.setTextColor(R.id.date_bold, color);
+            } else {
+                clockViews.setViewVisibility(R.id.date_regular, View.VISIBLE);
+                clockViews.setViewVisibility(R.id.date_bold, View.GONE);
+                clockViews.setTextColor(R.id.date_regular, color);
+            }
         } else {
-            clockViews.setViewVisibility(R.id.date_regular, View.VISIBLE);
-            clockViews.setViewVisibility(R.id.date_bold, View.GONE);
+            clockViews.setViewVisibility(R.id.date, View.VISIBLE);
+            clockViews.setTextColor(R.id.date, color);
         }
 
         // Show the panel
@@ -232,7 +238,7 @@ public class ClockWidgetService extends Service {
     }
 
     private void setClockSize(RemoteViews clockViews, float scale) {
-        float fontSize = mContext.getResources().getDimension(R.dimen.widget_big_font_size);
+        float fontSize = getResources().getDimension(R.dimen.widget_big_font_size);
         clockViews.setTextViewTextSize(R.id.clock1_bold, TypedValue.COMPLEX_UNIT_PX, fontSize * scale);
         clockViews.setTextViewTextSize(R.id.clock1_regular, TypedValue.COMPLEX_UNIT_PX, fontSize * scale);
         clockViews.setTextViewTextSize(R.id.clock2_bold, TypedValue.COMPLEX_UNIT_PX, fontSize * scale);
@@ -242,34 +248,55 @@ public class ClockWidgetService extends Service {
     //===============================================================================================
     // Alarm related functionality
     //===============================================================================================
-    private void refreshAlarmStatus(RemoteViews alarmViews) {
-        boolean showAlarm = mSharedPrefs.getBoolean(Constants.CLOCK_SHOW_ALARM, true);
-        boolean isBold = mSharedPrefs.getBoolean(Constants.CLOCK_FONT_DATE, true);
-
-        // Update Alarm status
-        if (showAlarm) {
+    private void refreshAlarmStatus(RemoteViews alarmViews, boolean smallWidget) {
+        if (Preferences.showAlarm(this)) {
             String nextAlarm = getNextAlarm();
             if (!TextUtils.isEmpty(nextAlarm)) {
                 // An alarm is set, deal with displaying it
-                alarmViews.setTextViewText(isBold ? R.id.nextAlarm_bold : R.id.nextAlarm_regular,
-                        nextAlarm.toString().toUpperCase());
-                alarmViews.setViewVisibility(R.id.nextAlarm_bold, isBold ? View.VISIBLE : View.GONE);
-                alarmViews.setViewVisibility(R.id.nextAlarm_regular, isBold ? View.GONE : View.VISIBLE);
+                int color = Preferences.clockAlarmFontColor(this);
+
+                // Overlay the selected color on the alarm icon and set the imageview
+                alarmViews.setImageViewBitmap(R.id.alarm_icon,
+                        WidgetUtils.getOverlaidBitmap(this, R.drawable.ic_alarm_small, color));
+                alarmViews.setViewVisibility(R.id.alarm_icon, View.VISIBLE);
+
+                if (!smallWidget) {
+                    if (Preferences.useBoldFontForDateAndAlarms(this)) {
+                        alarmViews.setTextViewText(R.id.nextAlarm_bold, nextAlarm.toString().toUpperCase(Locale.getDefault()));
+                        alarmViews.setViewVisibility(R.id.nextAlarm_bold, View.VISIBLE);
+                        alarmViews.setViewVisibility(R.id.nextAlarm_regular, View.GONE);
+                        alarmViews.setTextColor(R.id.nextAlarm_bold, color);
+                    } else {
+                        alarmViews.setTextViewText(R.id.nextAlarm_regular, nextAlarm.toString().toUpperCase(Locale.getDefault()));
+                        alarmViews.setViewVisibility(R.id.nextAlarm_regular, View.VISIBLE);
+                        alarmViews.setViewVisibility(R.id.nextAlarm_bold, View.GONE);
+                        alarmViews.setTextColor(R.id.nextAlarm_regular, color);
+                    }
+                } else {
+                    alarmViews.setTextViewText(R.id.nextAlarm, nextAlarm.toString().toUpperCase(Locale.getDefault()));
+                    alarmViews.setViewVisibility(R.id.nextAlarm, View.VISIBLE);
+                    alarmViews.setTextColor(R.id.nextAlarm, color);
+                }
                 return;
             }
         }
 
         // No alarm set or Alarm display is hidden, hide the views
-        alarmViews.setViewVisibility(R.id.nextAlarm_bold, View.GONE);
-        alarmViews.setViewVisibility(R.id.nextAlarm_regular, View.GONE);
+        alarmViews.setViewVisibility(R.id.alarm_icon, View.GONE);
+        if (!smallWidget) {
+            alarmViews.setViewVisibility(R.id.nextAlarm_bold, View.GONE);
+            alarmViews.setViewVisibility(R.id.nextAlarm_regular, View.GONE);
+        } else {
+            alarmViews.setViewVisibility(R.id.nextAlarm, View.GONE);
+        }
     }
 
     /**
      * @return A formatted string of the next alarm or null if there is no next alarm.
      */
     private String getNextAlarm() {
-        String nextAlarm = Settings.System.getString(mContext.getContentResolver(),
-                Settings.System.NEXT_ALARM_FORMATTED);
+        String nextAlarm = Settings.System.getString(
+                getContentResolver(), Settings.System.NEXT_ALARM_FORMATTED);
         if (nextAlarm == null || TextUtils.isEmpty(nextAlarm)) {
             return null;
         }
@@ -279,444 +306,136 @@ public class ClockWidgetService extends Service {
     //===============================================================================================
     // Weather related functionality
     //===============================================================================================
-    private static final String URL_YAHOO_API_WEATHER = "http://weather.yahooapis.com/forecastrss?w=%s&u=";
-    private static WeatherInfo mWeatherInfo = new WeatherInfo();
-    private WeatherQueryTask mWeatherQueryTask;
-
-    private class WeatherQueryTask extends AsyncTask<Void, Void, WeatherInfo> {
-        @Override
-        protected WeatherInfo doInBackground(Void... params) {
-            // Load the preferences
-            boolean useCustomLoc = mSharedPrefs.getBoolean(Constants.WEATHER_USE_CUSTOM_LOCATION, false);
-            String customLoc = mSharedPrefs.getString(Constants.WEATHER_CUSTOM_LOCATION_STRING, null);
-
-            // Get location related stuff ready
-            LocationManager locationManager =
-                    (LocationManager) mContext.getSystemService(Context.LOCATION_SERVICE);
-            String woeid = null;
-
-            if (customLoc != null && useCustomLoc) {
-                // custom location
-                try {
-                    woeid = YahooPlaceFinder.GeoCode(mContext, customLoc);
-                    if (DEBUG)
-                        Log.d(TAG, "Yahoo location code for " + customLoc + " is " + woeid);
-                } catch (Exception e) {
-                    Log.e(TAG, "ERROR: Could not get Location code", e);
-                }
-            } else {
-                // network location
-                Location loc = locationManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
-
-                if (loc != null) {
-                    try {
-                        woeid = YahooPlaceFinder.reverseGeoCode(mContext,
-                                loc.getLatitude(), loc.getLongitude());
-                        if (DEBUG)
-                            Log.d(TAG, "Yahoo location code for current geolocation is " + woeid);
-                    } catch (Exception e) {
-                        Log.e(TAG, "ERROR: Could not get Location code", e);
-                    }
-                } else {
-                    Log.e(TAG, "ERROR: Location returned null");
-                }
-                if (DEBUG) {
-                    Log.d(TAG, "Location code is " + woeid);
-                }
-            }
-
-            if (woeid != null) {
-                try {
-                    return parseXml(getDocument(woeid));
-                } catch (Exception e) {
-                    Log.e(TAG, "ERROR: Could not parse weather return info", e);
-                }
-            }
-
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(WeatherInfo info) {
-            if (info != null) {
-                setWeatherData(info);
-                mWeatherInfo = info;
-            } else if (mWeatherInfo.temp.equals(WeatherInfo.NODATA)) {
-                setNoWeatherData();
-            } else {
-                setWeatherData(mWeatherInfo);
-            }
-        }
-    }
-
     /**
      * Display the weather information
-     * @param w
      */
-    private void setWeatherData(WeatherInfo w) {
-        // Load the preferences
-        boolean showLocation = mSharedPrefs.getBoolean(Constants.WEATHER_SHOW_LOCATION, true);
-        boolean showTimestamp = mSharedPrefs.getBoolean(Constants.WEATHER_SHOW_TIMESTAMP, true);
-        boolean invertLowhigh = mSharedPrefs.getBoolean(Constants.WEATHER_INVERT_LOWHIGH, false);
-        boolean defaultIcons = !mSharedPrefs.getBoolean(Constants.WEATHER_USE_ALTERNATE_ICONS, false);
+    private void setWeatherData(RemoteViews weatherViews, boolean smallWidget, WeatherInfo w) {
+        int color = Preferences.weatherFontColor(this);
+        int timestampColor = Preferences.weatherTimestampFontColor(this);
+        boolean colorIcons = Preferences.useAlternateWeatherIcons(this);
 
-        // Get the views ready
-        RemoteViews weatherViews = new RemoteViews(mContext.getPackageName(), R.layout.appwidget);
-
-        // Weather Image - Either the default or alternate set
-        String prefix = defaultIcons ? "weather_" : "weather2_";
-        String conditionCode = w.condition_code;
-        String condition_filename = prefix + conditionCode;
-
-        // Get the resource id based on the constructed name
-        final Resources res = getBaseContext().getResources();
-        int resID = res.getIdentifier(condition_filename, "drawable",
-                getBaseContext().getPackageName());
-
-        if (DEBUG)
-            Log.d("Weather", "Condition:" + conditionCode + " ID:" + resID);
-
-        if (resID != 0) {
-            weatherViews.setImageViewResource(R.id.weather_image, resID);
+        // Weather Image
+        if (colorIcons) {
+            // No additional color overlays needed
+            weatherViews.setImageViewResource(R.id.weather_image, w.getConditionResource());
         } else {
-            weatherViews.setImageViewResource(R.id.weather_image,
-                    defaultIcons ? R.drawable.weather_na : R.drawable.weather2_na);
+            // Overlay the condition image with the appropriate color
+            weatherViews.setImageViewBitmap(R.id.weather_image, w.getConditionBitmap(color));
         }
-
-        // City
-        weatherViews.setTextViewText(R.id.weather_city, w.city);
-        weatherViews.setViewVisibility(R.id.weather_city, showLocation ? View.VISIBLE : View.GONE);
 
         // Weather Condition
-        weatherViews.setTextViewText(R.id.weather_condition, w.condition);
+        weatherViews.setTextViewText(R.id.weather_condition, w.getCondition());
         weatherViews.setViewVisibility(R.id.weather_condition, View.VISIBLE);
-
-        // Weather Update Time
-        long now = System.currentTimeMillis();
-        if (now - w.last_sync < 60000) {
-            weatherViews.setTextViewText(R.id.update_time, res.getString(R.string.weather_last_sync_just_now));
-        } else {
-            weatherViews.setTextViewText(R.id.update_time, DateUtils.getRelativeTimeSpanString(
-                    w.last_sync, now, DateUtils.MINUTE_IN_MILLIS));
-        }
-        weatherViews.setViewVisibility(R.id.update_time, showTimestamp ? View.VISIBLE : View.GONE);
+        weatherViews.setTextColor(R.id.weather_condition, color);
 
         // Weather Temps Panel
-        weatherViews.setTextViewText(R.id.weather_temp, w.temp);
-        weatherViews.setTextViewText(R.id.weather_low_high, invertLowhigh ? w.high + " | " + w.low : w.low + " | " + w.high);
+        weatherViews.setTextViewText(R.id.weather_temp, w.getFormattedTemperature());
         weatherViews.setViewVisibility(R.id.weather_temps_panel, View.VISIBLE);
+        weatherViews.setTextColor(R.id.weather_temp, color);
+
+        if (!smallWidget) {
+            // Display the full weather information panel items
+            // Load the preferences
+            boolean showLocation = Preferences.showWeatherLocation(this);
+            boolean showTimestamp = Preferences.showWeatherTimestamp(this);
+
+            // City
+            weatherViews.setTextViewText(R.id.weather_city, w.getCity());
+            weatherViews.setViewVisibility(R.id.weather_city, showLocation ? View.VISIBLE : View.GONE);
+            weatherViews.setTextColor(R.id.weather_city, color);
+
+            // Weather Update Time
+            if (showTimestamp) {
+                Date updateTime = w.getTimestamp();
+                StringBuilder sb = new StringBuilder();
+                sb.append(DateFormat.format("E", updateTime));
+                sb.append(" ");
+                sb.append(DateFormat.getTimeFormat(this).format(updateTime));
+                weatherViews.setTextViewText(R.id.update_time, sb.toString());
+                weatherViews.setViewVisibility(R.id.update_time, View.VISIBLE);
+                weatherViews.setTextColor(R.id.update_time, timestampColor);
+            } else {
+                weatherViews.setViewVisibility(R.id.update_time, View.GONE);
+            }
+
+            // Weather Temps Panel additional items
+            boolean invertLowhigh = Preferences.invertLowHighTemperature(this);
+            final String low = w.getFormattedLow();
+            final String high = w.getFormattedHigh();
+            weatherViews.setTextViewText(R.id.weather_low_high, invertLowhigh ? high + " | " + low : low + " | " + high);
+            weatherViews.setTextColor(R.id.weather_low_high, color);
+        }
 
         // Register an onClickListener on Weather
         setWeatherClickListener(weatherViews);
-
-        // Update the rest of the widget and stop
-        updateAndExit(weatherViews);
     }
 
     /**
-     * There is no data to display, display 'empty' fields and the
-     * 'Tap to reload' message
+     * There is no data to display, display 'empty' fields and the 'Tap to reload' message
      */
-    private void setNoWeatherData() {
-        boolean defaultIcons = !mSharedPrefs.getBoolean(Constants.WEATHER_USE_ALTERNATE_ICONS, false);
-
+    private void setNoWeatherData(RemoteViews weatherViews, boolean smallWidget) {
+        boolean defaultIcons = !Preferences.useAlternateWeatherIcons(this);
         final Resources res = getBaseContext().getResources();
-        RemoteViews weatherViews = new RemoteViews(mContext.getPackageName(), R.layout.appwidget);
+        int color = Preferences.weatherFontColor(this);
 
         // Weather Image - Either the default or alternate set
         weatherViews.setImageViewResource(R.id.weather_image,
                 defaultIcons ? R.drawable.weather_na : R.drawable.weather2_na);
 
-        // Rest of the data
-        weatherViews.setTextViewText(R.id.weather_city, res.getString(R.string.weather_no_data));
-        weatherViews.setViewVisibility(R.id.weather_city, View.VISIBLE);
-        weatherViews.setTextViewText(R.id.weather_condition, res.getString(R.string.weather_tap_to_refresh));
-        weatherViews.setViewVisibility(R.id.update_time, View.GONE);
+        if (!smallWidget) {
+            weatherViews.setTextViewText(R.id.weather_city, res.getString(R.string.weather_no_data));
+            weatherViews.setViewVisibility(R.id.weather_city, View.VISIBLE);
+            weatherViews.setViewVisibility(R.id.update_time, View.GONE);
+            weatherViews.setTextColor(R.id.weather_city, color);
+        }
+
         weatherViews.setViewVisibility(R.id.weather_temps_panel, View.GONE);
+        weatherViews.setTextViewText(R.id.weather_condition, res.getString(R.string.weather_tap_to_refresh));
+        weatherViews.setTextColor(R.id.weather_condition, color);
 
         // Register an onClickListener on Weather
         setWeatherClickListener(weatherViews);
-
-        // Update the rest of the widget and stop
-        updateAndExit(weatherViews);
     }
 
     private void setWeatherClickListener(RemoteViews weatherViews) {
-        Intent weatherClickIntent = new Intent(mContext, ClockWidgetProvider.class);
-        weatherClickIntent.putExtra(Constants.FORCE_REFRESH, true);
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(mContext, 0, weatherClickIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT);
-        weatherViews.setOnClickPendingIntent(R.id.weather_panel, pendingIntent);
-    }
-
-    /**
-     * Get the weather forecast XML document for a specific location
-     * @param woeid
-     * @return
-     */
-    private Document getDocument(String woeid) {
-        try {
-            boolean celcius = mSharedPrefs.getBoolean(Constants.WEATHER_USE_METRIC, true);
-            String urlWithDegreeUnit;
-            if (celcius) {
-                urlWithDegreeUnit = URL_YAHOO_API_WEATHER + "c";
-            } else {
-                urlWithDegreeUnit = URL_YAHOO_API_WEATHER + "f";
-            }
-            return new HttpRetriever().getDocumentFromURL(String.format(urlWithDegreeUnit, woeid));
-        } catch (IOException e) {
-            Log.e(TAG, "Error querying Yahoo weather");
-        }
-        return null;
-    }
-
-    /**
-     * Parse the weather XML document
-     * @param wDoc
-     * @return
-     */
-    private WeatherInfo parseXml(Document wDoc) {
-        try {
-            return new WeatherXmlParser(getBaseContext()).parseWeatherResponse(wDoc);
-        } catch (Exception e) {
-            Log.e(TAG, "Error parsing Yahoo weather XML document", e);
-        }
-        return null;
+        weatherViews.setOnClickPendingIntent(R.id.weather_panel,
+                WeatherUpdateService.getUpdateIntent(this, true));
     }
 
     //===============================================================================================
     // Calendar related functionality
     //===============================================================================================
-    private boolean refreshCalendar(RemoteViews calendarViews) {
-        // Load the settings
-        boolean showCalendar = mSharedPrefs.getBoolean(Constants.SHOW_CALENDAR, false);
-        Set<String> calendarList = mSharedPrefs.getStringSet(Constants.CALENDAR_LIST, null);
-        boolean remindersOnly = mSharedPrefs.getBoolean(Constants.CALENDAR_REMINDERS_ONLY, false);
-        boolean hideAllDay = mSharedPrefs.getBoolean(Constants.CALENDAR_HIDE_ALLDAY, false);
-        long lookAhead = Long.parseLong(mSharedPrefs.getString(Constants.CALENDAR_LOOKAHEAD, "10800000"));
-        boolean hasEvents = false;
+    private void refreshCalendar(RemoteViews calendarViews, int widgetId) {
+        // Calendar icon: Overlay the selected color and set the imageview
+        int color = Preferences.calendarFontColor(this);
+        calendarViews.setImageViewBitmap(R.id.calendar_icon,
+                WidgetUtils.getOverlaidBitmap(this, R.drawable.ic_lock_idle_calendar, color));
 
-        if (showCalendar) {
-            String[][] nextCalendar = null;
-            nextCalendar = getNextCalendarAlarm(lookAhead, calendarList, remindersOnly, hideAllDay);
+        // Set up and start the Calendar RemoteViews service
+        final Intent remoteAdapterIntent = new Intent(this, CalendarWidgetService.class);
+        remoteAdapterIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
+        remoteAdapterIntent.setData(Uri.parse(remoteAdapterIntent.toUri(Intent.URI_INTENT_SCHEME)));
+        calendarViews.setRemoteAdapter(R.id.calendar_list, remoteAdapterIntent);
+        calendarViews.setEmptyView(R.id.calendar_list, R.id.calendar_empty_view);
 
-            // Remove all the views to start
-            calendarViews.removeAllViews(R.id.calendar_panel);
+        // Register an onClickListener on Calendar starting the Calendar app
+        final Intent calendarClickIntent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR);
+        final PendingIntent calendarClickPendingIntent = PendingIntent.getActivity(this, 0, calendarClickIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        calendarViews.setOnClickPendingIntent(R.id.calendar_icon, calendarClickPendingIntent);
 
-            // Iterate through the calendars, up to the maximum
-            for (int i = 0; i < MAX_CALENDAR_ITEMS; i++) {
-                if (nextCalendar[i][0] != null) {
-                    final RemoteViews itemViews = new RemoteViews(mContext.getPackageName(),
-                            R.layout.calendar_item);
-                    WidgetUtils.setClockColor(mContext, itemViews, mSharedPrefs);
-
-                    // Only set the icon on the first event
-                    if (!hasEvents) {
-                        itemViews.setImageViewResource(R.id.calendar_icon, R.drawable.ic_lock_idle_calendar);
-                    }
-
-                    // Add the event text fields
-                    itemViews.setTextViewText(R.id.calendar_event_title, nextCalendar[i][0]);
-                    if (nextCalendar[i][1] != null) {
-                        itemViews.setTextViewText(R.id.calendar_event_details, nextCalendar[i][1]);
-                    }
-
-                    // Add the view to the panel
-                    calendarViews.addView(R.id.calendar_panel, itemViews);
-                    hasEvents = true;
-                }
-            }
-        }
-
-        // Register an onClickListener on Calendar if it contains any events, starting the Calendar app
-        if (hasEvents) {
-            ComponentName cal = new ComponentName("com.android.calendar", "com.android.calendar.AllInOneActivity");
-            Intent i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(cal);
-            PendingIntent pi = PendingIntent.getActivity(mContext, 0, i, PendingIntent.FLAG_UPDATE_CURRENT);
-            calendarViews.setOnClickPendingIntent(R.id.calendar_panel, pi);
-        }
-
-        return hasEvents;
+        final Intent eventClickIntent = new Intent(Intent.ACTION_VIEW);
+        final PendingIntent eventClickPendingIntent = PendingIntent.getActivity(this, 0, eventClickIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+        calendarViews.setPendingIntentTemplate(R.id.calendar_list, eventClickPendingIntent);
     }
 
-    /**
-     * @return A formatted string of the next calendar event with a reminder
-     * (for showing on the lock screen), or null if there is no next event
-     * within a certain look-ahead time.
-     */
-    private String[][] getNextCalendarAlarm(long lookahead, Set<String> calendars,
-            boolean remindersOnly, boolean hideAllDay) {
-        long now = System.currentTimeMillis();
-        long later = now + lookahead;
+    public static PendingIntent getRefreshIntent(Context context) {
+        Intent i = new Intent(context, ClockWidgetService.class);
+        i.setAction(ClockWidgetService.ACTION_REFRESH_CALENDAR);
+        return PendingIntent.getService(context, 0, i, PendingIntent.FLAG_UPDATE_CURRENT);
+    }
 
-        // Build the 'where' clause
-        StringBuilder where = new StringBuilder();
-        if (remindersOnly) {
-            where.append(CalendarContract.Events.HAS_ALARM + "=1");
-        }
-        if (calendars != null && calendars.size() > 0) {
-            if (remindersOnly) {
-                where.append(" AND ");
-            }
-            where.append(CalendarContract.Events.CALENDAR_ID + " in (");
-            int i = 0;
-            for (String s : calendars) {
-                where.append(s);
-                if (i != calendars.size() - 1) {
-                    where.append(",");
-                }
-                i++;
-            }
-            where.append(") ");
-        }
-
-        // Projection array
-        String[] projection = new String[] {
-            CalendarContract.Events.TITLE,
-            CalendarContract.Instances.BEGIN,
-            CalendarContract.Events.DESCRIPTION,
-            CalendarContract.Events.EVENT_LOCATION,
-            CalendarContract.Events.ALL_DAY,
-            CalendarContract.Events.CALENDAR_ID
-        };
-
-        // The indices for the projection array
-        int TITLE_INDEX = 0;
-        int BEGIN_TIME_INDEX = 1;
-        int DESCRIPTION_INDEX = 2;
-        int LOCATION_INDEX = 3;
-        int ALL_DAY_INDEX = 4;
-        int CALENDAR_ID_INDEX = 5;
-
-        Uri uri = Uri.withAppendedPath(CalendarContract.Instances.CONTENT_URI,
-                String.format("%d/%d", now, later));
-        String[][] nextCalendarAlarm = new String[MAX_CALENDAR_ITEMS][2];
-        Cursor cursor = null;
-
-        try {
-            cursor = mContext.getContentResolver().query(uri, projection,
-                    where.toString(), null, "begin ASC");
-
-            if (cursor != null) {
-                cursor.moveToFirst();
-                // Iterate through returned rows to a maximum number of calendar events
-                for (int i = 0, eventCount = 0; i < cursor.getCount() && eventCount < MAX_CALENDAR_ITEMS; i++) {
-                    String title = cursor.getString(TITLE_INDEX);
-                    long begin = cursor.getLong(BEGIN_TIME_INDEX);
-                    String description = cursor.getString(DESCRIPTION_INDEX);
-                    String location = cursor.getString(LOCATION_INDEX);
-                    boolean allDay = cursor.getInt(ALL_DAY_INDEX) != 0;
-                    int calendarId = cursor.getInt(CALENDAR_ID_INDEX);
-                    if (DEBUG) {
-                        Log.d(TAG, "Event: " + title + " from calendar with id: " + calendarId);
-                    }
-
-                    // If skipping all day events, continue the loop without incementing eventCount
-                    if (allDay && hideAllDay) {
-                        cursor.moveToNext();
-                        continue;
-                    }
-
-                    // Check the next event in the case of all day event. As UTC is used for all day
-                    // events, the next event may be the one that actually starts sooner
-                    if (allDay && !cursor.isLast()) {
-                        cursor.moveToNext();
-                        long nextBegin = cursor.getLong(BEGIN_TIME_INDEX);
-                        if (nextBegin < begin + TimeZone.getDefault().getOffset(begin)) {
-                            title = cursor.getString(TITLE_INDEX);
-                            begin = nextBegin;
-                            description = cursor.getString(DESCRIPTION_INDEX);
-                            location = cursor.getString(LOCATION_INDEX);
-                            allDay = cursor.getInt(ALL_DAY_INDEX) != 0;
-                        }
-                        // Go back since we are still iterating
-                        cursor.moveToPrevious();
-                    }
-
-                    // Set the event title as the first array item
-                    nextCalendarAlarm[eventCount][0] = title.toString();
-
-                    // Start building the event details string
-                    // Starting with the date
-                    Date start = new Date(begin);
-                    StringBuilder sb = new StringBuilder();
-
-                    if (allDay) {
-                        SimpleDateFormat sdf = new SimpleDateFormat(
-                                mContext.getString(R.string.abbrev_wday_month_day_no_year));
-                        // Calendar stores all-day events in UTC -- setting the time zone ensures
-                        // the correct date is shown.
-                        sdf.setTimeZone(TimeZone.getTimeZone(Time.TIMEZONE_UTC));
-                        sb.append(sdf.format(start));
-                    } else {
-                        sb.append(DateFormat.format("E", start));
-                        sb.append(" ");
-                        sb.append(DateFormat.getTimeFormat(mContext).format(start));
-                    }
-
-                    // Add the event location if it should be shown
-                    int showLocation = Integer.parseInt(mSharedPrefs.getString(Constants.CALENDAR_SHOW_LOCATION, "0"));
-                    if (showLocation != 0 && !TextUtils.isEmpty(location)) {
-                        switch(showLocation) {
-                            case 1:
-                                // Show first line
-                                int end = location.indexOf('\n');
-                                if(end == -1) {
-                                    sb.append(": " + location);
-                                } else {
-                                    sb.append(": " + location.substring(0, end));
-                                }
-                                break;
-                            case 2:
-                                // Show all
-                                sb.append(": " + location);
-                                break;
-                        }
-                    }
-
-                    // Add the event description if it should be shown
-                    int showDescription = Integer.parseInt(mSharedPrefs.getString(Constants.CALENDAR_SHOW_DESCRIPTION, "0"));
-                    if (showDescription != 0 && !TextUtils.isEmpty(description)) {
-
-                        // Show the appropriate separator
-                        if (showLocation == 0) {
-                            sb.append(": ");
-                        } else {
-                            sb.append(" - ");
-                        }
-
-                        switch(showDescription) {
-                            case 1:
-                                // Show first line
-                                int end = description.indexOf('\n');
-                                if(end == -1) {
-                                    sb.append(description);
-                                } else {
-                                    sb.append(description.substring(0, end));
-                                }
-                                break;
-                            case 2:
-                                // Show all
-                                sb.append(description);
-                                break;
-                        }
-                    }
-
-                    // Set the time, location and description as the second array item
-                    nextCalendarAlarm[eventCount][1] = sb.toString();
-                    cursor.moveToNext();
-
-                    // Increment the event counter
-                    eventCount++;
-                }
-            }
-        } catch (Exception e) {
-            // Do nothing
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-        }
-        return nextCalendarAlarm;
+    public static void cancelUpdates(Context context) {
+        AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        am.cancel(getRefreshIntent(context));
     }
 }
